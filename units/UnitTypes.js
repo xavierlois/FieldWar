@@ -11,7 +11,7 @@ export const UNIT_TYPES = {
     attackValue: 2,
     color: '#8b9467',
     commands: [
-      'advance-to', 'guard-position', 'charge', 'hold-the-line', 'ordered-retreat',
+      'guard-position', 'charge', 'hold-the-line', 'ordered-retreat',
       'screen', 'rally', 'feint', 'scatter', 'patrol', 'formation-advance',
       'ambush', 'envelop', 'cover-team'
     ]
@@ -26,7 +26,7 @@ export const UNIT_TYPES = {
     attackValue: 2,
     color: '#7a9e7e',
     commands: [
-      'advance-to', 'overwatch', 'suppressive-fire', 'skirmish', 'ordered-retreat',
+      'overwatch', 'suppressive-fire', 'skirmish', 'ordered-retreat',
       'scatter', 'guard-position', 'ambush', 'hold-the-line'
     ]
   },
@@ -40,7 +40,7 @@ export const UNIT_TYPES = {
     attackValue: 1,
     color: '#7a7a8c',
     commands: [
-      'advance-to', 'hold-the-line', 'screen', 'cover-team', 'guard-position',
+      'hold-the-line', 'screen', 'cover-team', 'guard-position',
       'ordered-retreat', 'rally', 'breach', 'formation-advance'
     ]
   },
@@ -54,7 +54,7 @@ export const UNIT_TYPES = {
     attackValue: 3,
     color: '#9e7a7a',
     commands: [
-      'advance-to', 'charge', 'skirmish', 'envelop', 'breach', 'feint',
+      'charge', 'skirmish', 'envelop', 'breach', 'feint',
       'ordered-retreat', 'scatter', 'ambush', 'attack-along-path'
     ]
   },
@@ -69,14 +69,13 @@ export const UNIT_TYPES = {
     color: '#9e8f5a',
     hillPenalty: true,
     commands: [
-      'advance-to', 'charge', 'envelop', 'attack-along-path', 'feint',
+      'charge', 'envelop', 'attack-along-path', 'feint',
       'ordered-retreat', 'scatter', 'formation-advance', 'encircle'
     ]
   }
 }
 
 export const COMMAND_DEFS = {
-  'advance-to':        { label: 'Advance To',  desc: 'Tap a hex — units move there', ap: 1 },
   'guard-position':    { label: 'Guard',       desc: 'Hold hex, auto-attack entering enemies', ap: 1 },
   'patrol':            { label: 'Patrol',       desc: 'Move along defined path', ap: 1 },
   'cover-team':        { label: 'Cover Team',   desc: 'Follow and shield a target team', ap: 1 },

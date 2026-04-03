@@ -57,7 +57,9 @@ function resolutionLoop() {
   processDeaths()
 
   // 5. Check end conditions (rendering handled by main.js RAF loop)
-  const done = isResolutionComplete() || elapsedTime > RESOLUTION_DURATION
+  // Require at least 1.5s before early-complete check — units start with
+  // worldX === targetWorldX so isResolutionComplete would fire immediately otherwise
+  const done = (elapsedTime > 1.5 && isResolutionComplete()) || elapsedTime > RESOLUTION_DURATION
 
   if (done) {
     stopResolution()
