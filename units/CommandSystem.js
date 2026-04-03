@@ -7,7 +7,7 @@ import { EventBus } from '../core/EventBus.js'
 
 // Commands that need a target hex
 export const NEEDS_TARGET_HEX = new Set([
-  'guard-position', 'overwatch', 'patrol', 'attack-along-path'
+  'advance-to', 'guard-position', 'overwatch', 'patrol', 'attack-along-path'
 ])
 
 // Commands that need an enemy target team
@@ -34,6 +34,7 @@ export function executeTeamCommand(team, grid, dt) {
   }
 
   switch (cmd) {
+    case 'advance-to':      return execAdvanceTo(units, team, grid, dt)
     case 'charge':          return execCharge(units, team, grid, dt)
     case 'guard-position':  return execGuard(units, team, grid, dt)
     case 'hold-the-line':   return execHold(units, team, grid, dt)
@@ -60,6 +61,17 @@ export function executeTeamCommand(team, grid, dt) {
 }
 
 // ── COMMAND IMPLEMENTATIONS ──────────────────────────────────────────
+
+function execAdvanceTo(units, team, grid, dt) {
+  const dest = team.targetHex
+  if (!dest) { defaultAdvance(units, team.faction, grid, dt); return true }
+  const enemies = getEnemies(team)
+  units.forEach(unit => {
+    moveUnitToward(unit, dest.q, dest.r, grid, dt)
+    tryAttack(unit, enemies, grid)
+  })
+  return true
+}
 
 function defaultAdvance(units, faction, grid, dt) {
   const enemies = faction === 'player'
