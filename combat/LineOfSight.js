@@ -1,4 +1,5 @@
 import { hexToWorld, effectiveHeight, hexDistance } from '../core/HexGrid.js'
+import { getUnitType } from '../units/UnitTypes.js'
 
 // Check line of sight between two hex positions
 // Returns true if attacker can see target
@@ -37,6 +38,17 @@ export function hasLOS(grid, fromQ, fromR, toQ, toR) {
 function getHexHeight(grid, q, r) {
   const hex = grid.get(`${q},${r}`)
   return hex ? effectiveHeight(hex) : 0
+}
+
+export function getDynamicAttackRange(team, grid, targetQ, targetR) {
+  const uClass = getUnitType(team.unitType)
+  const baseRange = uClass.attackRange || 1
+  if (team.unitType === 'archer') {
+    const fromH = getHexHeight(grid, team.q, team.r)
+    const toH = getHexHeight(grid, targetQ, targetR)
+    return fromH > toH ? 3 : 2
+  }
+  return baseRange
 }
 
 // Get hex coordinates along a line (cube coordinate lerp)
