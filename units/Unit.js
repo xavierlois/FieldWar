@@ -17,6 +17,7 @@ export class Unit {
     this.move = def.move
     this.attackRange = def.attackRange
     this.attackValue = def.attackValue
+    this.defense = def.defense ?? 0
 
     // Position
     this.q = q

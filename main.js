@@ -13,6 +13,7 @@ import { initHexRenderer, renderGrid } from './render/HexRenderer.js'
 import { initBuildingRenderer, renderBuildings } from './render/BuildingRenderer.js'
 import { initUnitRenderer, preloadUnitTextures, renderTeams, updateTeamPositions } from './render/UnitRenderer.js'
 import { initSelectionRenderer, updateOverlays } from './render/SelectionRenderer.js'
+import { initCombatFeedback, updateCombatFeedback } from './render/CombatFeedback.js'
 import { updateTopBar } from './render/UIRenderer.js'
 
 import { initInputManager } from './input/InputManager.js'
@@ -32,6 +33,7 @@ initHexRenderer()
 initUnitRenderer()
 initSelectionRenderer()
 initBuildingRenderer(getScene())
+initCombatFeedback()
 initTurnManager()  // registers execute-clicked, resolution-complete handlers
 
 // Input wired once (persists across battles)
@@ -48,6 +50,7 @@ function gameLoop(timestamp) {
 
   updateTeamPositions([...GameState.units.values()], dt)
   updateOverlays(dt)
+  updateCombatFeedback(dt)
   getRenderer().render(getScene(), getCamera())
 }
 requestAnimationFrame(gameLoop)

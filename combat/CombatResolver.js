@@ -41,11 +41,11 @@ export function resolveAttack(attacker, defender, grid) {
   if (flank === 'side') damage += 1
   if (flank === 'rear') damage += 2
 
-  // Defender bonuses
-  damage -= getDefenseBonus(defender)
+  // Defender base defense stat
+  damage -= defender.defense
 
-  // Shield bearer passive
-  if (defender.type === 'shield-bearer') damage -= 1
+  // Command and status defense bonuses
+  damage -= getDefenseBonus(defender)
 
   // Ambush surprise bonus
   if (attacker.inAmbush) damage += 1

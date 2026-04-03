@@ -11,35 +11,35 @@ export const UNIT_TYPES = {
   'foot-soldier': {
     label: 'Foot Soldiers',
     icon: '⚔️',
-    hp: 3, ap: 3, move: 2, attackRange: 1, attackValue: 2,
+    hp: 3, ap: 3, move: 2, attackRange: 1, attackValue: 2, defense: 0,
     color: '#8b9467',
     commands: ALL_COMMANDS
   },
   'archer': {
     label: 'Archers',
     icon: '🏹',
-    hp: 2, ap: 3, move: 2, attackRange: 3, attackValue: 2,
+    hp: 2, ap: 3, move: 2, attackRange: 3, attackValue: 2, defense: 0,
     color: '#7a9e7e',
     commands: ALL_COMMANDS
   },
   'shield-bearer': {
     label: 'Shield Bearers',
     icon: '🛡️',
-    hp: 4, ap: 2, move: 1, attackRange: 1, attackValue: 1,
+    hp: 4, ap: 2, move: 1, attackRange: 1, attackValue: 1, defense: 2,
     color: '#7a7a8c',
     commands: ALL_COMMANDS
   },
   'swordsman': {
     label: 'Swordsmen',
     icon: '🗡️',
-    hp: 3, ap: 3, move: 2, attackRange: 1, attackValue: 3,
+    hp: 3, ap: 3, move: 2, attackRange: 1, attackValue: 3, defense: 0,
     color: '#9e7a7a',
     commands: ALL_COMMANDS
   },
   'knight': {
     label: 'Knights',
     icon: '🐎',
-    hp: 4, ap: 4, move: 3, attackRange: 1, attackValue: 3,
+    hp: 4, ap: 4, move: 3, attackRange: 1, attackValue: 3, defense: 1,
     color: '#9e8f5a',
     hillPenalty: true,
     commands: ALL_COMMANDS

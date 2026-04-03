@@ -157,3 +157,10 @@ export function flashTeam(teamId, color = 0xff4444, duration = 300) {
 export function getTeamSpriteList() {
   return [...teamSprites.values()].map(d => d.sprite)
 }
+
+export function getTeamWorldPosition(teamId) {
+  const data = teamSprites.get(teamId)
+  if (!data) return null
+  const p = data.sprite.position
+  return { x: p.x, y: p.y, z: p.z }
+}

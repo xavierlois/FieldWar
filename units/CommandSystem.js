@@ -1,5 +1,5 @@
 import { GameState } from '../core/GameState.js'
-import { hexPath, reachableHexes, hexDistance, hexNeighbors, hexToWorld } from '../core/HexGrid.js'
+import { hexPath, reachableHexes, hexDistance, hexNeighbors, hexToWorld, effectiveHeight } from '../core/HexGrid.js'
 import { resolveAttack } from '../combat/CombatResolver.js'
 import { hasLOS } from '../combat/LineOfSight.js'
 import { setUnitTargetPosition } from '../render/UnitRenderer.js'
@@ -460,6 +460,19 @@ function moveUnitToward(unit, destQ, destR, grid, dt, speedMult = 1.0) {
 
 const ATTACK_COOLDOWN = 1.5  // seconds between attacks
 
+// Melee units: always 1. Archers: base 3, +1 per elevation above target, -1 in valley.
+function effectiveAttackRange(attacker, defender, grid) {
+  if (attacker.attackRange <= 1) return 1
+  const aHex = grid.get(`${attacker.q},${attacker.r}`)
+  const dHex = grid.get(`${defender.q},${defender.r}`)
+  const aH = effectiveHeight(aHex || { height: 1, building: null })
+  const dH = effectiveHeight(dHex || { height: 1, building: null })
+  let range = attacker.attackRange
+  if (aH > dH) range += (aH - dH)
+  if (aH === 0) range -= 1
+  return Math.max(1, Math.min(range, 6))
+}
+
 function tryAttack(attacker, enemies, grid) {
   if (!attacker.alive) return
   if (attacker.attackCooldown > 0) return
@@ -467,7 +480,7 @@ function tryAttack(attacker, enemies, grid) {
   const inRange = enemies.filter(e => {
     if (!e.alive) return false
     const dist = hexDistance(attacker.q, attacker.r, e.q, e.r)
-    return dist <= attacker.attackRange
+    return dist <= effectiveAttackRange(attacker, e, grid)
   })
 
   if (inRange.length === 0) return
