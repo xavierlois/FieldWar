@@ -1,13 +1,14 @@
 import { GameState } from '../core/GameState.js'
-import { hexPath, reachableHexes, hexDistance, hexNeighbors, hexToWorld, effectiveHeight, moveCost } from '../core/HexGrid.js'
+import { hexPath, reachableHexes, hexDistance, hexNeighbors, hexesInRange, hexToWorld, effectiveHeight, moveCost } from '../core/HexGrid.js'
 import { resolveAttack } from '../combat/CombatResolver.js'
-import { hasLOS } from '../combat/LineOfSight.js'
-import { setUnitTargetPosition } from '../render/UnitRenderer.js'
 import { EventBus } from '../core/EventBus.js'
+import { getDynamicAttackRange } from '../combat/LineOfSight.js'
+import { getUnitType } from '../units/UnitTypes.js'
+
 
 // Commands that need a target hex
 export const NEEDS_TARGET_HEX = new Set([
-  'charge', 'guard-position', 'overwatch', 'patrol', 'attack-along-path'
+  'guard-position', 'charge', 'patrol', 'attack-along-path', 'ambush', 'overwatch'
 ])
 
 // Commands that need an enemy target team
@@ -23,491 +24,380 @@ export const NEEDS_ALLY_TARGET = new Set([
 // Execute a team's command for one resolution step
 // Returns true if the command is still active (not complete)
 export function executeTeamCommand(team, grid, dt) {
-  const units = GameState.getAliveTeamUnits(team)
-  if (units.length === 0) return false
+  if (!team.isAlive) return false
 
-  const cmd = team.emergencyCommand || team.command
-  if (!cmd) {
-    // No command: advance toward nearest enemy
-    defaultAdvance(units, team.faction, grid, dt)
-    return true
+  // Reduce cooldown
+  team.attackCooldown = Math.max(0, team.attackCooldown - dt)
+
+  let active = false
+  const command = team.emergencyUsed && team.emergencyCommand ? team.emergencyCommand : team.command
+
+  switch (command) {
+    case 'charge': active = execCharge(team, grid, dt); break
+    case 'guard-position': active = execGuard(team, grid, dt); break
+    case 'hold-the-line': active = execHold(team, grid, dt); break
+    case 'overwatch': active = execOverwatch(team, grid, dt); break
+    case 'suppressive-fire': active = execSuppressiveFire(team, grid, dt); break
+    case 'ordered-retreat': active = execRetreat(team, grid, dt); break
+    case 'scatter': active = execScatter(team, grid, dt); break
+    case 'skirmish': active = execSkirmish(team, grid, dt); break
+    case 'ambush': active = execAmbush(team, grid, dt); break
+    case 'screen': active = execScreen(team, grid, dt); break
+    case 'rally': active = execRally(team, grid, dt); break
+    case 'feint': active = execFeint(team, grid, dt); break
+    case 'cover-team': active = execCoverTeam(team, grid, dt); break
+    case 'envelop': active = execEnvelop(team, grid, dt); break
+    case 'patrol': active = execPatrol(team, grid, dt); break
+    case 'attack-along-path': active = execAttackAlongPath(team, grid, dt); break
+    case 'formation-advance': active = execFormationAdvance(team, grid, dt); break
+    case 'encircle': active = execEncircle(team, grid, dt); break
+    default: active = false; break // Do nothing if no command assigned
   }
 
-  switch (cmd) {
-    case 'charge':          return execCharge(units, team, grid, dt)
-    case 'guard-position':  return execGuard(units, team, grid, dt)
-    case 'hold-the-line':   return execHold(units, team, grid, dt)
-    case 'overwatch':       return execOverwatch(units, team, grid, dt)
-    case 'suppressive-fire':return execSuppressiveFire(units, team, grid, dt)
-    case 'ordered-retreat': return execRetreat(units, team, grid, dt)
-    case 'scatter':         return execScatter(units, team, grid, dt)
-    case 'skirmish':        return execSkirmish(units, team, grid, dt)
-    case 'ambush':          return execAmbush(units, team, grid, dt)
-    case 'screen':          return execScreen(units, team, grid, dt)
-    case 'rally':           return execRally(units, team, grid, dt)
-    case 'feint':           return execFeint(units, team, grid, dt)
-    case 'breach':          return execCharge(units, team, grid, dt)  // breach uses charge movement
-    case 'cover-team':      return execCoverTeam(units, team, grid, dt)
-    case 'envelop':         return execEnvelop(units, team, grid, dt)
-    case 'patrol':          return execPatrol(units, team, grid, dt)
-    case 'attack-along-path': return execAttackAlongPath(units, team, grid, dt)
-    case 'formation-advance': return execFormationAdvance(units, team, grid, dt)
-    case 'encircle':        return execEncircle(units, team, grid, dt)
-    default:
-      defaultAdvance(units, team.faction, grid, dt)
-      return true
-  }
+  // Handle combat after any move step — allow when team just finished moving
+  // (team.moving is set false by setTimeout, so this frame check allows attacks after arrival)
+  const enemies = getEnemies(team)
+  tryAttack(team, enemies, grid)
+
+  return active
 }
 
 // ── COMMAND IMPLEMENTATIONS ──────────────────────────────────────────
 
-function defaultAdvance(units, faction, grid, dt) {
-  const enemies = faction === 'player'
-    ? GameState.aiUnits
-    : GameState.playerUnits
-
-  units.forEach(unit => {
-    const target = findNearestEnemy(unit, enemies)
-    if (!target) return
-    moveUnitToward(unit, target.q, target.r, grid, dt)
-    tryAttack(unit, enemies, grid)
-  })
-}
-
-function execCharge(units, team, grid, dt) {
+function defaultAdvance(team, grid, dt) {
   const enemies = getEnemies(team)
-  const dest = team.targetHex
-  units.forEach(unit => {
-    unit.exposed = true
-    if (dest) {
-      moveUnitToward(unit, dest.q, dest.r, grid, dt, 1.5)
-    } else {
-      const target = findNearestEnemy(unit, enemies)
-      if (target) moveUnitToward(unit, target.q, target.r, grid, dt, 1.5)
-    }
-    tryAttack(unit, enemies, grid)
-  })
+  const nearest = findNearestEnemy(team, enemies)
+  if (!nearest) return false
+
+  moveTeamToward(team, nearest.q, nearest.r, grid, dt)
   return true
 }
 
-function execGuard(units, team, grid, dt) {
-  const guardHex = team.targetHex
-  units.forEach(unit => {
-    if (guardHex) {
-      moveUnitToward(unit, guardHex.q, guardHex.r, grid, dt)
-    }
-    // Attack enemies that come within range
-    const enemies = getEnemies(team)
-    tryAttack(unit, enemies, grid)
-  })
+function execCharge(team, grid, dt) {
+  if (!team.targetHex) return false
+  const { q, r } = team.targetHex
+  return moveTeamToward(team, q, r, grid, dt, 1.5)
+}
+
+function execGuard(team, grid, dt) {
+  if (!team.targetHex) return false
+  const { q, r } = team.targetHex
+  if (team.q === q && team.r === r) {
+    return true // We are holding
+  }
+  return moveTeamToward(team, q, r, grid, dt)
+}
+
+function execHold(team, grid, dt) {
+  GameState.getAliveTeamUnits(team).forEach(u => u.holdingLine = true)
   return true
 }
 
-function execHold(units, team, grid, dt) {
-  units.forEach(unit => {
-    unit.holdingLine = true
-    // Stay put, attack in range
-    const enemies = getEnemies(team)
-    tryAttack(unit, enemies, grid)
-  })
+function execOverwatch(team, grid, dt) {
+  if (!team.targetHex) return false
+  const { q, r } = team.targetHex
+  if (team.q !== q || team.r !== r) {
+    moveTeamToward(team, q, r, grid, dt)
+  }
   return true
 }
 
-function execOverwatch(units, team, grid, dt) {
-  units.forEach(unit => {
-    // Stay put, auto-attack first enemy entering range
-    const enemies = getEnemies(team)
-    const inRange = enemies.filter(e =>
-      hexDistance(unit.q, unit.r, e.q, e.r) <= unit.attackRange &&
-      hasLOS(GameState.grid, unit.q, unit.r, e.q, e.r)
-    )
-    if (inRange.length > 0) {
-      tryAttack(unit, inRange, grid)
-    }
-  })
-  return true
-}
+function execSuppressiveFire(team, grid, dt) {
+  if (!team.targetTeamId) return false
+  const target = GameState.getTeam(team.targetTeamId)
+  if (!target || !target.isAlive) return false
 
-function execSuppressiveFire(units, team, grid, dt) {
-  const targetTeam = GameState.getTeam(team.targetTeamId)
-  if (!targetTeam) { defaultAdvance(units, team.faction, grid, dt); return true }
+  const dist = hexDistance(team.q, team.r, target.q, target.r)
+  const rng = getDynamicAttackRange(GameState.getAliveTeamUnits(team)[0], grid, target.q, target.r)
 
-  const targetUnits = GameState.getAliveTeamUnits(targetTeam)
-  units.forEach(unit => {
-    // Move to range then fire
-    const target = targetUnits[0]
-    if (!target) return
-    if (hexDistance(unit.q, unit.r, target.q, target.r) > unit.attackRange) {
-      moveUnitToward(unit, target.q, target.r, grid, dt)
-    } else {
-      // Apply suppression
-      targetUnits.forEach(t => { t.suppressed = true })
-      tryAttack(unit, targetUnits, grid)
-    }
-  })
-  return true
-}
-
-function execRetreat(units, team, grid, dt) {
-  const retreatDir = team.faction === 'player' ? 1 : -1  // player retreats toward bottom (positive r)
-  units.forEach(unit => {
-    // Move away from enemies
-    const enemies = getEnemies(team)
-    const target = findNearestEnemy(unit, enemies)
-    if (!target) {
-      // Just move backward
-      const destR = unit.r + retreatDir * 2
-      const destQ = unit.q
-      moveUnitToward(unit, destQ, destR, grid, dt)
-    } else {
-      // Move away from nearest enemy
-      const dq = unit.q - target.q
-      const dr = unit.r - target.r
-      const destQ = unit.q + Math.sign(dq)
-      const destR = unit.r + Math.sign(dr) + retreatDir
-      moveUnitToward(unit, destQ, destR, grid, dt)
-    }
-  })
-  return true
-}
-
-function execScatter(units, team, grid, dt) {
-  units.forEach((unit, idx) => {
-    // Each unit scatters in a different direction
-    const angle = (idx / units.length) * Math.PI * 2
-    const dq = Math.round(Math.cos(angle) * 3)
-    const dr = Math.round(Math.sin(angle) * 3)
-    moveUnitToward(unit, unit.q + dq, unit.r + dr, grid, dt)
-  })
-  return true
-}
-
-function execSkirmish(units, team, grid, dt) {
-  const enemies = getEnemies(team)
-  units.forEach(unit => {
-    const target = findNearestEnemy(unit, enemies)
-    if (!target) return
-    const dist = hexDistance(unit.q, unit.r, target.q, target.r)
-    if (dist <= unit.attackRange) {
-      // Attack then retreat
-      tryAttack(unit, [target], grid)
-      execRetreat([unit], team, grid, dt)
-    } else {
-      moveUnitToward(unit, target.q, target.r, grid, dt)
-    }
-  })
-  return true
-}
-
-function execAmbush(units, team, grid, dt) {
-  units.forEach(unit => {
-    unit.inAmbush = true
-    const enemies = getEnemies(team)
-    const inRange = enemies.filter(e =>
-      hexDistance(unit.q, unit.r, e.q, e.r) <= unit.attackRange
-    )
-    if (inRange.length > 0) {
-      unit.inAmbush = false  // revealed on attack
-      tryAttack(unit, inRange, grid)
-    }
-  })
-  return true
-}
-
-function execScreen(units, team, grid, dt) {
-  // Find the weakest allied unit and move to protect them
-  const alliedTeams = team.faction === 'player'
-    ? GameState.allPlayerTeams
-    : GameState.allAITeams
-  let weakestUnit = null
-  let minHpRatio = 1
-  alliedTeams.forEach(t => {
-    if (t.id === team.id) return
-    GameState.getAliveTeamUnits(t).forEach(u => {
-      const ratio = u.hp / u.maxHp
-      if (ratio < minHpRatio) { minHpRatio = ratio; weakestUnit = u }
-    })
-  })
-
-  if (weakestUnit) {
-    units.forEach(unit => {
-      // Move adjacent to weakest ally
-      const neighbors = hexNeighbors(weakestUnit.q, weakestUnit.r)
-      const dest = neighbors.find(n => {
-        const h = GameState.grid.get(`${n.q},${n.r}`)
-        return h?.passable && !h.unitId
-      }) || weakestUnit
-      moveUnitToward(unit, dest.q, dest.r, grid, dt)
-    })
+  if (dist > rng) {
+    moveTeamToward(team, target.q, target.r, grid, dt)
   } else {
-    defaultAdvance(units, team.faction, grid, dt)
+    GameState.getAliveTeamUnits(target).forEach(u => u.suppressed = true)
   }
   return true
 }
 
-function execRally(units, team, grid, dt) {
-  units.forEach(unit => {
-    unit.rallied = true
-    // Buff adjacent friendly units
-    hexNeighbors(unit.q, unit.r).forEach(({ q, r }) => {
-      const u = GameState.getUnitAt(q, r)
-      if (u && u.faction === unit.faction) {
-        u.rallied = true
-      }
-    })
-  })
-  return true
-}
-
-function execFeint(units, team, grid, dt) {
+function execRetreat(team, grid, dt) {
   const enemies = getEnemies(team)
-  units.forEach(unit => {
-    const target = findNearestEnemy(unit, enemies)
-    if (!target) return
-    moveUnitToward(unit, target.q, target.r, grid, dt)
-    // NO attack — just advance
-  })
-  return true
+  const nearest = findNearestEnemy(team, enemies)
+  if (!nearest) return false
+
+  // Move away from nearest enemy
+  const dq = team.q - nearest.q
+  const dr = team.r - nearest.r
+  const targetQ = team.q + Math.sign(dq) * 2
+  const targetR = team.r + Math.sign(dr) * 2
+
+  return moveTeamToward(team, targetQ, targetR, grid, dt, 1.2)
 }
 
-function execCoverTeam(units, team, grid, dt) {
-  const targetTeam = GameState.getTeam(team.targetTeamId)
-  if (!targetTeam) { defaultAdvance(units, team.faction, grid, dt); return true }
-
-  const targetUnits = GameState.getAliveTeamUnits(targetTeam)
+function execScatter(team, grid, dt) {
   const enemies = getEnemies(team)
+  const nearest = findNearestEnemy(team, enemies)
+  if (!nearest) return false
 
-  units.forEach((unit, idx) => {
-    // Stay near target team units
-    const target = targetUnits[idx % targetUnits.length]
-    if (!target) return
-
-    const dist = hexDistance(unit.q, unit.r, target.q, target.r)
-    if (dist > 2) {
-      moveUnitToward(unit, target.q, target.r, grid, dt)
-    }
-    // Intercept nearby enemies
-    const nearEnemy = enemies.find(e =>
-      hexDistance(unit.q, unit.r, e.q, e.r) <= unit.attackRange
-    )
-    if (nearEnemy) tryAttack(unit, [nearEnemy], grid)
-  })
+  const dq = team.q - nearest.q
+  const dr = team.r - nearest.r
+  moveTeamToward(team, team.q + dq * 3, team.r + dr * 3, grid, dt, 1.5)
   return true
 }
 
-function execEnvelop(units, team, grid, dt) {
+function execSkirmish(team, grid, dt) {
   const enemies = getEnemies(team)
-  const partnerTeam = GameState.getTeam(team.targetTeamId)
+  const nearest = findNearestEnemy(team, enemies)
+  if (!nearest) return false
 
-  units.forEach((unit, idx) => {
-    const target = findNearestEnemy(unit, enemies)
-    if (!target) return
+  const maxRange = GameState.getAliveTeamUnits(team)[0]?.maxAttackRange || 1
+  const dist = hexDistance(team.q, team.r, nearest.q, nearest.r)
 
-    // Half go left flank, half go right flank
-    const side = idx % 2 === 0 ? 1 : -1
-    const flankQ = target.q + side * 2
-    const flankR = target.r
-
-    const dest = findValidHex(flankQ, flankR)
-    if (dest) moveUnitToward(unit, dest.q, dest.r, grid, dt)
-    tryAttack(unit, enemies, grid)
-  })
+  if (dist <= maxRange) {
+    const dq = team.q - nearest.q
+    const dr = team.r - nearest.r
+    moveTeamToward(team, team.q + Math.sign(dq), team.r + Math.sign(dr), grid, dt)
+  } else {
+    moveTeamToward(team, nearest.q, nearest.r, grid, dt)
+  }
   return true
 }
 
-function execPatrol(units, team, grid, dt) {
-  if (!team.patrolPath || team.patrolPath.length === 0) {
-    defaultAdvance(units, team.faction, grid, dt)
+function execAmbush(team, grid, dt) {
+  if (!team.targetHex) return false
+  const { q, r } = team.targetHex
+  if (team.q !== q || team.r !== r) {
+    moveTeamToward(team, q, r, grid, dt)
+  } else {
+    GameState.getAliveTeamUnits(team).forEach(u => u.inAmbush = true)
+  }
+  return true
+}
+
+function execScreen(team, grid, dt) {
+  if (!team.targetTeamId) return false
+  const ally = GameState.getTeam(team.targetTeamId)
+  if (!ally || !ally.isAlive) return false
+
+  const enemies = getEnemies(team)
+  const nearestEnemy = findNearestEnemy(ally, enemies)
+  if (!nearestEnemy) {
+    moveTeamToward(team, ally.q, ally.r, grid, dt)
     return true
   }
 
-  if (!team._patrolIndex) team._patrolIndex = 0
+  // Position between ally and enemy
+  const midQ = Math.round((ally.q + nearestEnemy.q) / 2)
+  const midR = Math.round((ally.r + nearestEnemy.r) / 2)
 
-  const waypoint = team.patrolPath[team._patrolIndex]
-  units.forEach(unit => {
-    const dist = hexDistance(unit.q, unit.r, waypoint.q, waypoint.r)
-    if (dist <= 1) {
-      team._patrolIndex = (team._patrolIndex + 1) % team.patrolPath.length
-    } else {
-      moveUnitToward(unit, waypoint.q, waypoint.r, grid, dt)
-    }
-  })
+  moveTeamToward(team, midQ, midR, grid, dt)
   return true
 }
 
-function execAttackAlongPath(units, team, grid, dt) {
-  if (!team.patrolPath || team.patrolPath.length === 0) {
-    execCharge(units, team, grid, dt)
+function execRally(team, grid, dt) {
+  GameState.getAliveTeamUnits(team).forEach(u => u.rallied = true)
+  return true
+}
+
+function execFeint(team, grid, dt) {
+  return execSkirmish(team, grid, dt)
+}
+
+function execCoverTeam(team, grid, dt) {
+  if (!team.targetTeamId) return false
+  const ally = GameState.getTeam(team.targetTeamId)
+  if (!ally || !ally.isAlive) return false
+
+  const dist = hexDistance(team.q, team.r, ally.q, ally.r)
+  if (dist > 1) {
+    moveTeamToward(team, ally.q, ally.r, grid, dt)
+  }
+  return true
+}
+
+function execEnvelop(team, grid, dt) {
+  if (!team.targetTeamId) return false
+  const target = GameState.getTeam(team.targetTeamId)
+  if (!target || !target.isAlive) return false
+
+  // Try to move to the opposite side of target's current facing
+  const backsideQ = target.q - 2
+  const backsideR = target.r + 1
+  moveTeamToward(team, backsideQ, backsideR, grid, dt)
+  return true
+}
+
+function execPatrol(team, grid, dt) {
+  if (!team.patrolPath || team.patrolPath.length === 0) return false
+  if (team.pathIndex >= team.patrolPath.length) {
+    team.patrolPath.reverse()
+    team.pathIndex = 0
+  }
+
+  const dest = team.patrolPath[team.pathIndex]
+  if (team.q === dest.q && team.r === dest.r) {
+    team.pathIndex++
     return true
   }
 
-  const enemies = getEnemies(team)
-  if (!team._patrolIndex) team._patrolIndex = 0
-  const waypoint = team.patrolPath[Math.min(team._patrolIndex, team.patrolPath.length - 1)]
-
-  units.forEach(unit => {
-    tryAttack(unit, enemies, grid)
-    const dist = hexDistance(unit.q, unit.r, waypoint.q, waypoint.r)
-    if (dist <= 1) {
-      team._patrolIndex = Math.min(team._patrolIndex + 1, team.patrolPath.length - 1)
-    }
-    moveUnitToward(unit, waypoint.q, waypoint.r, grid, dt, 1.3)
-  })
+  moveTeamToward(team, dest.q, dest.r, grid, dt)
   return true
 }
 
-function execFormationAdvance(units, team, grid, dt) {
-  if (units.length === 0) return false
-  // Use centroid of team as reference point
-  const cx = units.reduce((s, u) => s + u.q, 0) / units.length
-  const cr = units.reduce((s, u) => s + u.r, 0) / units.length
-
-  const enemies = getEnemies(team)
-  const target = enemies.reduce((nearest, e) => {
-    const d = hexDistance(cx, cr, e.q, e.r)
-    return !nearest || d < hexDistance(cx, cr, nearest.q, nearest.r) ? e : nearest
-  }, null)
-
-  if (!target) return true
-
-  units.forEach(unit => {
-    moveUnitToward(unit, target.q, target.r, grid, dt)
-    tryAttack(unit, enemies, grid)
-  })
-  return true
+function execAttackAlongPath(team, grid, dt) {
+  return execPatrol(team, grid, dt)
 }
 
-function execEncircle(units, team, grid, dt) {
-  const enemies = getEnemies(team)
-  const target = enemies.find(Boolean)
-  if (!target) return true
+function execFormationAdvance(team, grid, dt) {
+  return defaultAdvance(team, grid, dt)
+}
 
-  units.forEach((unit, idx) => {
-    // Spread around target at 60-degree intervals
-    const angle = (idx / units.length) * Math.PI * 2
-    const destQ = target.q + Math.round(Math.cos(angle) * 2)
-    const destR = target.r + Math.round(Math.sin(angle) * 2)
-    const dest = findValidHex(destQ, destR)
-    if (dest) moveUnitToward(unit, dest.q, dest.r, grid, dt)
-    tryAttack(unit, enemies, grid)
-  })
-  return true
+function execEncircle(team, grid, dt) {
+  return execEnvelop(team, grid, dt)
 }
 
 // ── HELPERS ────────────────────────────────────────────────────────
 
 function getEnemies(team) {
-  return team.faction === 'player' ? GameState.aiUnits : GameState.playerUnits
+  return team.faction === 'player' ? GameState.allAITeams.filter(t => t.isAlive) : GameState.allPlayerTeams.filter(t => t.isAlive)
 }
 
-function findNearestEnemy(unit, enemies) {
-  if (enemies.length === 0) return null
-  return enemies.reduce((nearest, e) => {
-    const d = hexDistance(unit.q, unit.r, e.q, e.r)
-    const nd = nearest ? hexDistance(unit.q, unit.r, nearest.q, nearest.r) : Infinity
-    return d < nd ? e : nearest
-  }, null)
+function findNearestEnemy(team, enemies) {
+  let min = Infinity
+  let nearest = null
+  enemies.forEach(e => {
+    const d = hexDistance(team.q, team.r, e.q, e.r)
+    if (d < min) { min = d; nearest = e }
+  })
+  return nearest
 }
 
 function findValidHex(q, r) {
-  const hex = GameState.grid.get(`${q},${r}`)
-  if (hex?.passable) return { q, r }
-  // Try neighbors
-  const neighbors = hexNeighbors(q, r)
-  return neighbors.find(n => {
-    const h = GameState.grid.get(`${n.q},${n.r}`)
-    return h?.passable
-  })
-}
+  const h = GameState.grid.get(`${q},${r}`)
+  if (h && h.passable && !h.teamId) return { q, r }
 
-// Move a unit one step toward (destQ, destR)
-// Called each frame during resolution
-const UNIT_SPEED = 2.0  // hexes per second base
-
-function moveUnitToward(unit, destQ, destR, grid, dt, speedMult = 1.0) {
-  if (unit.q === destQ && unit.r === destR) return
-
-  // Check if target position is occupied
-  const destHex = grid.get(`${destQ},${destR}`)
-  if (!destHex?.passable) return
-
-  // Find path — use large range so units can navigate the full map
-  const path = hexPath(grid, unit.q, unit.r, destQ, destR, 60)
-  if (!path || path.length === 0) return
-
-  const nextHex = path[0]
-
-  // Move visually (smooth interpolation handled by UnitRenderer)
-  // Only actually change hex position when we "arrive" at the next hex
-  // Use a timer-based approach: each unit has a moveProgress
-  if (!unit._moveProgress) unit._moveProgress = 0
-
-  // Scale speed by terrain cost of the next hex — hills and forest slow movement
-  const nextHexData = grid.get(`${nextHex.q},${nextHex.r}`)
-  const terrainCost = nextHexData ? moveCost(nextHexData) : 1
-  const speed = (UNIT_SPEED * speedMult * GameState.resolutionSpeed) / terrainCost
-
-  unit._moveProgress += speed * dt
-
-  if (unit._moveProgress >= 1.0) {
-    unit._moveProgress = 0
-    // Update unit hex position
-    GameState.moveUnit(unit, nextHex.q, nextHex.r)
-    setUnitTargetPosition(unit, nextHex.q, nextHex.r)
-
-    // Update facing
-    const dq = nextHex.q - unit.q, dr = nextHex.r - unit.r
-    // Facing: index of direction moved
-    // (already moved, so direction from old to new)
+  // Expand outward ring by ring (hexesInRange returns all within radius N)
+  for (let rad = 1; rad <= 3; rad++) {
+    for (const n of hexesInRange(q, r, rad)) {
+      if (n.q === q && n.r === r) continue
+      const hn = GameState.grid.get(`${n.q},${n.r}`)
+      if (hn && hn.passable && !hn.teamId) return n
+    }
   }
+  return null
 }
 
-const ATTACK_COOLDOWN = 1.5  // seconds between attacks
+// Move a team one step toward (destQ, destR)
+// Called each frame during resolution
+const TEAM_SPEED_BASE = 2.0  // hexes per second base
 
-// Melee units: always 1. Archers: base 3, +1 per elevation above target, -1 in valley.
-function effectiveAttackRange(attacker, defender, grid) {
-  if (attacker.attackRange <= 1) return 1
-  const aHex = grid.get(`${attacker.q},${attacker.r}`)
-  const dHex = grid.get(`${defender.q},${defender.r}`)
-  const aH = effectiveHeight(aHex || { height: 1, building: null })
-  const dH = effectiveHeight(dHex || { height: 1, building: null })
-  let range = attacker.attackRange
-  if (aH > dH) range += (aH - dH)
-  if (aH === 0) range -= 1
-  return Math.max(1, Math.min(range, 6))
+function moveTeamToward(team, destQ, destR, grid, dt, speedMult = 1.0) {
+  if (team.moving) return true
+
+  const aliveUnits = GameState.getAliveTeamUnits(team)
+  if (aliveUnits.length === 0) return false
+  const anchorUnit = aliveUnits[0]
+
+  if (team.q === destQ && team.r === destR) {
+    team.plannedPath = []
+    team.pathIndex = 0
+    return false
+  }
+
+  // Need new path?
+  if (team.plannedPath.length === 0 || team.pathIndex >= team.plannedPath.length) {
+    const target = findValidHex(destQ, destR)
+    if (!target) return false
+
+    const p = hexPath(grid, team.q, team.r, target.q, target.r)
+    if (p && p.length > 0) {
+      team.plannedPath = p
+      team.pathIndex = 0
+    } else {
+      team.plannedPath = []
+      return false
+    }
+  }
+
+  // Next step
+  const nextIdx = team.pathIndex
+  if (nextIdx < team.plannedPath.length) {
+    const nq = team.plannedPath[nextIdx].q
+    const nr = team.plannedPath[nextIdx].r
+
+    // Check collision against other teams
+    const nHex = GameState.grid.get(`${nq},${nr}`)
+    if (nHex && nHex.teamId && nHex.teamId !== team.id) {
+      // path blocked! find detour!
+      const target = findValidHex(destQ, destR)
+      if (!target) {
+        team.plannedPath = []
+        return false
+      }
+      const p = hexPath(grid, team.q, team.r, target.q, target.r)
+      if (p && p.length > 0) {
+        team.plannedPath = p
+        team.pathIndex = 0
+      } else {
+        team.plannedPath = []
+      }
+      return true // Wait until next tick to try again
+    }
+
+    // Move
+    GameState.moveTeam(team, nq, nr)
+    team.pathIndex++
+    team.stepsTaken = (team.stepsTaken || 0) + 1
+
+    // Animation lockout
+    team.moving = true
+
+    // Compute terrain cost and dynamic speed
+    const uClass = getUnitType(team.unitType)
+    const baseSpeed = uClass.move || 1
+    const nHexCost = nHex ? moveCost(nHex) : 1
+    const speed = TEAM_SPEED_BASE * speedMult * baseSpeed * (1 / nHexCost)
+    const duration = 1.0 / speed
+
+    const w = hexToWorld(nq, nr)
+    team.targetWorldX = w.x
+    team.targetWorldZ = w.z
+
+    EventBus.emit('team-move', { teamId: team.id })
+
+    setTimeout(() => {
+      team.moving = false
+    }, (duration / GameState.resolutionSpeed) * 1000)
+
+    return true
+  }
+
+  team.plannedPath = []
+  return false
 }
 
-function tryAttack(attacker, enemies, grid) {
-  if (!attacker.alive) return
-  if (attacker.attackCooldown > 0) return
+function tryAttack(team, enemies, grid) {
+  if (team.attackCooldown > 0) return
 
+  const alive = GameState.getAliveTeamUnits(team)
+  if (alive.length === 0) return
+
+  // Find enemies in range
   const inRange = enemies.filter(e => {
-    if (!e.alive) return false
-    const dist = hexDistance(attacker.q, attacker.r, e.q, e.r)
-    return dist <= effectiveAttackRange(attacker, e, grid)
+    if (!e.isAlive) return false
+    const dist = hexDistance(team.q, team.r, e.q, e.r)
+    return dist <= getDynamicAttackRange(team, grid, e.q, e.r)
   })
-
   if (inRange.length === 0) return
 
-  // Attack weakest in range
-  const target = inRange.reduce((weakest, e) =>
-    e.hp < (weakest?.hp ?? Infinity) ? e : weakest, null)
-
-  if (!target) return
-
-  const result = resolveAttack(attacker, target, grid)
-  attacker.attackCooldown = ATTACK_COOLDOWN
-
-  if (result.killed) {
-    EventBus.emit('unit-killed', { unitId: target.id, killerId: attacker.id })
-  }
-
-  return result
-}
-
-// Reduce attack cooldowns each frame
-export function tickAttackCooldowns(units, dt) {
-  units.forEach(u => {
-    if (u.attackCooldown > 0) u.attackCooldown -= dt * GameState.resolutionSpeed
+  // Target lowest total HP
+  inRange.sort((a, b) => {
+    const aHp = GameState.getAliveTeamUnits(a).reduce((s, u) => s + u.hp, 0)
+    const bHp = GameState.getAliveTeamUnits(b).reduce((s, u) => s + u.hp, 0)
+    return aHp - bHp
   })
+
+  resolveAttack(team, inRange[0], grid)
+
+  // Cooldown from unit type's attack speed
+  const uType = getUnitType(team.unitType)
+  team.attackCooldown = uType.attackSpeed ?? 2.0
 }

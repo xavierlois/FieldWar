@@ -69,35 +69,37 @@ export const GameState = {
     return team.unitIds.map(id => this.units.get(id)).filter(u => u?.alive)
   },
 
-  getUnitAt(q, r) {
+  getTeamAt(q, r) {
     const hex = this.grid.get(`${q},${r}`)
-    if (!hex?.unitId) return null
-    return this.units.get(hex.unitId) || null
+    if (!hex?.teamId) return null
+    return this.getTeam(hex.teamId) || null
   },
 
-  placeUnit(unit) {
-    const old = this.grid.get(unit.key)
-    if (old) old.unitId = null
-    const hex = this.grid.get(`${unit.q},${unit.r}`)
-    if (hex) hex.unitId = unit.id
+  placeTeam(team) {
+    const hex = this.grid.get(`${team.q},${team.r}`)
+    if (hex) hex.teamId = team.id
   },
 
-  moveUnit(unit, q, r) {
-    const oldHex = this.grid.get(unit.key)
-    if (oldHex) oldHex.unitId = null
-    unit.q = q; unit.r = r
-    // Update facing: face the direction we just moved
-    const newHex = this.grid.get(unit.key)
-    if (newHex) newHex.unitId = unit.id
+  moveTeam(team, q, r) {
+    const oldHex = this.grid.get(`${team.q},${team.r}`)
+    if (oldHex && oldHex.teamId === team.id) oldHex.teamId = null
+    team.q = q
+    team.r = r
+    const newHex = this.grid.get(`${q},${r}`)
+    if (newHex) newHex.teamId = team.id
   },
 
   removeUnit(unit) {
-    const hex = this.grid.get(unit.key)
-    if (hex) hex.unitId = null
     unit.alive = false
     // Remove from team
     const team = this.getTeamForUnit(unit.id)
-    if (team) team.removeUnit(unit.id)
+    if (team) {
+      team.removeUnit(unit.id)
+      if (!team.isAlive) {
+        const hex = this.grid.get(`${team.q},${team.r}`)
+        if (hex && hex.teamId === team.id) hex.teamId = null
+      }
+    }
   },
 
   reset() {

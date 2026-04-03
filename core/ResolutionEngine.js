@@ -1,6 +1,6 @@
 import { GameState } from './GameState.js'
 import { EventBus } from './EventBus.js'
-import { executeTeamCommand, tickAttackCooldowns } from '../units/CommandSystem.js'
+import { executeTeamCommand } from '../units/CommandSystem.js'
 import { checkTriggers, snapshotUnitHP } from './TriggerSystem.js'
 import { animateDeath } from '../render/UnitRenderer.js'
 import { getClock } from '../render/SceneManager.js'
@@ -15,16 +15,15 @@ export function startResolution() {
   elapsedTime = 0
   GameState.resolutionComplete = false
 
-  // Reset all team emergency flags
+  // Reset all teams for new resolution phase
   ;[...GameState.allPlayerTeams, ...GameState.allAITeams].forEach(t => {
     t.emergencyUsed = false
     t._patrolIndex = undefined
-  })
-
-  // Reset per-unit resolution state
-  GameState.aliveUnits.forEach(u => {
-    u._moveProgress = 0
-    u.attackCooldown = 0
+    t.attackCooldown = 0
+    t.plannedPath = []
+    t.pathIndex = 0
+    t.moving = false
+    t.stepsTaken = 0
   })
 
   snapshotUnitHP()
@@ -39,12 +38,13 @@ function resolutionLoop() {
   const dt = Math.min(getClock().getDelta(), 0.05)  // cap dt at 50ms
   elapsedTime += dt * GameState.resolutionSpeed
 
-  // 1. Tick attack cooldowns
-  tickAttackCooldowns(GameState.aliveUnits, dt)
 
-  // 2. Execute all team commands
-  let anyActive = false
-  ;[...GameState.allPlayerTeams, ...GameState.allAITeams].forEach(team => {
+
+  // 1. tickAttackCooldowns is now handled natively inside executeTeamCommand per team
+
+  // Evaluate and queue up movements/effects based on set Commands
+  let anyActive = false;
+  [...GameState.playerTeams.values(), ...GameState.aiTeams.values()].forEach(team => {
     if (!team.isAlive) return
     const active = executeTeamCommand(team, GameState.grid, dt)
     if (active) anyActive = true
@@ -81,11 +81,14 @@ function processDeaths() {
 }
 
 function isResolutionComplete() {
-  // All units have reached their destinations and cooldowns expired
-  const allStill = GameState.aliveUnits.every(u => {
-    const dx = Math.abs(u.worldX - u.targetWorldX)
-    const dz = Math.abs(u.worldZ - u.targetWorldZ)
-    return dx < 0.05 && dz < 0.05 && u.attackCooldown <= 0
+  // All teams have reached their destinations and cooldowns expired
+  const allPlayerTeams = GameState.allPlayerTeams.filter(t => t.isAlive)
+  const allAITeams = GameState.allAITeams.filter(t => t.isAlive)
+
+  const allStill = [...allPlayerTeams, ...allAITeams].every(team => {
+    const dx = Math.abs(team.worldX - team.targetWorldX)
+    const dz = Math.abs(team.worldZ - team.targetWorldZ)
+    return dx < 0.05 && dz < 0.05 && team.attackCooldown <= 0
   })
   return allStill
 }

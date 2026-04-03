@@ -13,6 +13,23 @@ export class Team {
     this.targetTeamId = null        // for Cover Team, Envelop, etc.
     this.targetHex = null           // {q, r} for Guard, Overwatch etc.
     this.patrolPath = []            // [{q,r}] for Patrol command
+
+    // Positioning
+    this.q = 0
+    this.r = 0
+    this.facing = faction === 'player' ? 2 : 5  // direction index
+
+    // Visual State (World Position)
+    this.worldX = 0
+    this.worldZ = 0
+    this.targetWorldX = 0
+    this.targetWorldZ = 0
+
+    // Resolution State
+    this.plannedPath = []
+    this.pathIndex = 0
+    this.moving = false
+    this.attackCooldown = 0
   }
 
   get isAlive() { return this.unitIds.length > 0 }
@@ -27,6 +44,10 @@ export class Team {
     this.targetTeamId = null
     this.targetHex = null
   }
+
+  // Called every resolution RAF frame — must be a no-op.
+  // Per-resolution resets live in ResolutionEngine.startResolution().
+  startResolution() {}
 
   setCommand(command, opts = {}) {
     this.command = command

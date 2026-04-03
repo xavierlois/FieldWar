@@ -5,31 +5,40 @@ import { EventBus } from '../core/EventBus.js'
 
 // Resolve an attack between two units
 // Returns { damage, killed, blocked }
-export function resolveAttack(attacker, defender, grid) {
+export function resolveAttack(attackerTeam, defenderTeam, grid) {
+  const attackers = GameState.getAliveTeamUnits(attackerTeam)
+  const defenders = GameState.getAliveTeamUnits(defenderTeam)
+
+  if (attackers.length === 0 || defenders.length === 0) {
+    return { damage: 0, killed: false, blocked: true, reason: 'no-combatants' }
+  }
+
   // Check LOS for ranged
-  if (attacker.attackRange > 1) {
-    if (!hasLOS(grid, attacker.q, attacker.r, defender.q, defender.r)) {
+  if (attackers[0].attackRange > 1) {
+    if (!hasLOS(grid, attackerTeam.q, attackerTeam.r, defenderTeam.q, defenderTeam.r)) {
       return { damage: 0, killed: false, blocked: true, reason: 'no-los' }
     }
   }
 
-  let damage = attacker.attackValue
+  // One attack roll per team call — pick a random attacker
+  const attacker = attackers[Math.floor(Math.random() * attackers.length)]
+  const aliveDefenders = GameState.getAliveTeamUnits(defenderTeam)
+  if (aliveDefenders.length === 0) return { damage: 0, killed: false, blocked: true, reason: 'no-defenders' }
+  const defender = aliveDefenders[Math.floor(Math.random() * aliveDefenders.length)]
 
   // Elevation bonus
-  const aHex = grid.get(`${attacker.q},${attacker.r}`)
-  const dHex = grid.get(`${defender.q},${defender.r}`)
+  const aHex = grid.get(`${attackerTeam.q},${attackerTeam.r}`)
+  const dHex = grid.get(`${defenderTeam.q},${defenderTeam.r}`)
   const aH = aHex ? effectiveHeight(aHex) : 1
   const dH = dHex ? effectiveHeight(dHex) : 1
 
+  let damage = attacker.attackValue
   if (aH > dH) damage += 1
   if (aH < dH) damage -= 1
 
-  // Charge bonus
-  const attackerTeam = GameState.getTeamForUnit(attacker.id)
-  if (attackerTeam?.command === 'charge') damage += 2
-
-  // Breach bonus vs Shield Bearers
-  if (attackerTeam?.command === 'breach' && defender.type === 'shield-bearer') damage += 2
+  // Charge / breach bonus
+  if (attackerTeam.command === 'charge') damage += 2
+  if (attackerTeam.command === 'breach' && defender.type === 'shield-bearer') damage += 2
 
   // Cover reduction
   const cover = getCoverType(dHex)
@@ -37,29 +46,24 @@ export function resolveAttack(attacker, defender, grid) {
   if (cover === 'partial') damage -= 1
 
   // Flanking bonus
-  const flank = getFlankType(attacker.q, attacker.r, defender.q, defender.r, defender.facing)
+  const flank = getFlankType(attackerTeam.q, attackerTeam.r, defenderTeam.q, defenderTeam.r, defenderTeam.facing ?? 0)
   if (flank === 'side') damage += 1
   if (flank === 'rear') damage += 2
 
-  // Defender base defense stat
+  // Defense
   damage -= defender.defense
-
-  // Command and status defense bonuses
   damage -= getDefenseBonus(defender)
-
-  // Ambush surprise bonus
   if (attacker.inAmbush) damage += 1
 
   damage = Math.max(0, damage)
-
   const killed = defender.takeDamage(damage)
 
-  // After charge, unit is exposed
-  if (attackerTeam?.command === 'charge') {
-    attacker.exposed = true
-  }
-
   EventBus.emit('unit-attacked', { attackerId: attacker.id, defenderId: defender.id, damage, killed })
+
+  // After charge, team is exposed
+  if (attackerTeam.command === 'charge') {
+    attackers.forEach(u => u.exposed = true)
+  }
 
   return { damage, killed, blocked: false }
 }
