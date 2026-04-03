@@ -42,6 +42,13 @@ async function _addTeamSprite(team) {
   const aliveUnits = GameState.getAliveTeamUnits(team)
   if (aliveUnits.length === 0) return
 
+  // Initialize each unit's world position from its hex position
+  aliveUnits.forEach(unit => {
+    const wp = hexToWorld(unit.q, unit.r)
+    unit.worldX = wp.x;  unit.worldZ = wp.z
+    unit.targetWorldX = wp.x;  unit.targetWorldZ = wp.z
+  })
+
   const color = team.faction === 'player' ? PLAYER_COLOR : AI_COLOR
   const { canvas, ctx, baseCanvas } = await createTeamCanvas(team.unitType, color, 128, aliveUnits.length)
 
