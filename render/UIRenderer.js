@@ -113,6 +113,12 @@ export function renderCommandPanel(team) {
     row.appendChild(card)
   })
 
+  // Mouse wheel scrolls horizontally (scrollbar is hidden for aesthetics)
+  row.addEventListener('wheel', e => {
+    e.preventDefault()
+    row.scrollLeft += e.deltaY + e.deltaX
+  }, { passive: false })
+
   panel.appendChild(row)
 
   // Cancel button if command set
