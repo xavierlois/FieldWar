@@ -11,7 +11,7 @@ import { initTurnManager, startPlanning } from './core/TurnManager.js'
 import { initScene, getScene, getCamera, getRenderer } from './render/SceneManager.js'
 import { initHexRenderer, renderGrid } from './render/HexRenderer.js'
 import { initBuildingRenderer, renderBuildings } from './render/BuildingRenderer.js'
-import { initUnitRenderer, preloadUnitTextures, renderUnits, updateUnitPositions } from './render/UnitRenderer.js'
+import { initUnitRenderer, preloadUnitTextures, renderTeams, updateTeamPositions } from './render/UnitRenderer.js'
 import { initSelectionRenderer, updateOverlays } from './render/SelectionRenderer.js'
 import { updateTopBar } from './render/UIRenderer.js'
 
@@ -46,7 +46,7 @@ function gameLoop(timestamp) {
   const dt = Math.min((timestamp - lastTime) / 1000, 0.1)
   lastTime = timestamp
 
-  updateUnitPositions([...GameState.units.values()], dt)
+  updateTeamPositions([...GameState.units.values()], dt)
   updateOverlays(dt)
   getRenderer().render(getScene(), getCamera())
 }
@@ -72,7 +72,7 @@ async function handleBattleStart() {
 
   // Preload textures then render (teams already applied by PreBattleScreen)
   await preloadUnitTextures([...GameState.units.values()])
-  renderUnits([...GameState.units.values()])
+  await renderTeams([...GameState.playerTeams.values(), ...GameState.aiTeams.values()])
 
   updateTopBar()
   startPlanning()

@@ -3,7 +3,7 @@ import { EventBus } from '../core/EventBus.js'
 import { screenToWorld } from '../render/SceneManager.js'
 import { worldToHex } from '../core/HexGrid.js'
 import { getHexMeshList } from '../render/HexRenderer.js'
-import { getUnitSpriteList } from '../render/UnitRenderer.js'
+import { getTeamSpriteList } from '../render/UnitRenderer.js'
 import * as THREE from 'three'
 
 let canvas
@@ -54,7 +54,7 @@ function handleTap(clientX, clientY) {
   raycaster.setFromCamera(mouse, camera)
 
   // Check unit sprites first
-  const unitHit = raycaster.intersectObjects(getUnitSpriteList())
+  const unitHit = raycaster.intersectObjects(getTeamSpriteList())
   if (unitHit.length > 0) {
     const sprite = unitHit[0].object
     if (sprite.userData.unitId) {

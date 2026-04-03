@@ -1,77 +1,48 @@
-// Unit type definitions — stats, icons, available commands
+// All commands available to every unit type
+const ALL_COMMANDS = [
+  'charge', 'guard-position', 'hold-the-line', 'ordered-retreat',
+  'formation-advance', 'screen', 'rally', 'scatter', 'skirmish',
+  'overwatch', 'suppressive-fire', 'ambush', 'feint', 'patrol',
+  'cover-team', 'envelop', 'breach', 'attack-along-path', 'encircle'
+]
 
+// Unit type definitions — stats, icons
 export const UNIT_TYPES = {
   'foot-soldier': {
     label: 'Foot Soldiers',
     icon: '⚔️',
-    hp: 3,
-    ap: 3,
-    move: 2,
-    attackRange: 1,
-    attackValue: 2,
+    hp: 3, ap: 3, move: 2, attackRange: 1, attackValue: 2,
     color: '#8b9467',
-    commands: [
-      'guard-position', 'charge', 'hold-the-line', 'ordered-retreat',
-      'screen', 'rally', 'feint', 'scatter', 'patrol', 'formation-advance',
-      'ambush', 'envelop', 'cover-team'
-    ]
+    commands: ALL_COMMANDS
   },
   'archer': {
     label: 'Archers',
     icon: '🏹',
-    hp: 2,
-    ap: 3,
-    move: 2,
-    attackRange: 3,
-    attackValue: 2,
+    hp: 2, ap: 3, move: 2, attackRange: 3, attackValue: 2,
     color: '#7a9e7e',
-    commands: [
-      'overwatch', 'suppressive-fire', 'skirmish', 'ordered-retreat',
-      'scatter', 'guard-position', 'ambush', 'hold-the-line'
-    ]
+    commands: ALL_COMMANDS
   },
   'shield-bearer': {
     label: 'Shield Bearers',
     icon: '🛡️',
-    hp: 4,
-    ap: 2,
-    move: 1,
-    attackRange: 1,
-    attackValue: 1,
+    hp: 4, ap: 2, move: 1, attackRange: 1, attackValue: 1,
     color: '#7a7a8c',
-    commands: [
-      'hold-the-line', 'screen', 'cover-team', 'guard-position',
-      'ordered-retreat', 'rally', 'breach', 'formation-advance'
-    ]
+    commands: ALL_COMMANDS
   },
   'swordsman': {
     label: 'Swordsmen',
     icon: '🗡️',
-    hp: 3,
-    ap: 3,
-    move: 2,
-    attackRange: 1,
-    attackValue: 3,
+    hp: 3, ap: 3, move: 2, attackRange: 1, attackValue: 3,
     color: '#9e7a7a',
-    commands: [
-      'charge', 'skirmish', 'envelop', 'breach', 'feint',
-      'ordered-retreat', 'scatter', 'ambush', 'attack-along-path'
-    ]
+    commands: ALL_COMMANDS
   },
   'knight': {
     label: 'Knights',
     icon: '🐎',
-    hp: 4,
-    ap: 4,
-    move: 3,
-    attackRange: 1,
-    attackValue: 3,
+    hp: 4, ap: 4, move: 3, attackRange: 1, attackValue: 3,
     color: '#9e8f5a',
     hillPenalty: true,
-    commands: [
-      'charge', 'envelop', 'attack-along-path', 'feint',
-      'ordered-retreat', 'scatter', 'formation-advance', 'encircle'
-    ]
+    commands: ALL_COMMANDS
   }
 }
 
@@ -82,7 +53,7 @@ export const COMMAND_DEFS = {
   'ambush':            { label: 'Ambush',       desc: 'Hide, auto-attack first enemy in range', ap: 1 },
   'overwatch':         { label: 'Overwatch',    desc: 'Hold fire, attack first enemy entering zone', ap: 1 },
   'suppressive-fire':  { label: 'Suppress',     desc: 'Pin enemy — reduce their AP by 1', ap: 1 },
-  'charge':            { label: 'Charge',       desc: '+2 dmg, exposed next round', ap: 1 },
+  'charge':            { label: 'Charge',       desc: 'Tap destination — +2 dmg, exposed next round', ap: 1 },
   'skirmish':          { label: 'Skirmish',     desc: 'Attack then retreat 1 hex', ap: 1 },
   'hold-the-line':     { label: 'Hold',         desc: '+1 defense, cannot advance', ap: 1 },
   'screen':            { label: 'Screen',       desc: 'Interpose for a retreating team', ap: 1 },

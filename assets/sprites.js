@@ -135,6 +135,40 @@ export function createUnitCanvas(unitType, tintColor, size = 64) {
   return svgToCanvas(svgStr, tintColor, size)
 }
 
+// Create a unit canvas with a count badge drawn on top
+// Returns { canvas, ctx, baseCanvas } so the count can be redrawn cheaply
+export async function createTeamCanvas(unitType, tintColor, size, count) {
+  const baseCanvas = await createUnitCanvas(unitType, tintColor, size)
+  const canvas = document.createElement('canvas')
+  canvas.width = size; canvas.height = size
+  const ctx = canvas.getContext('2d')
+  drawTeamCount(ctx, baseCanvas, size, count)
+  return { canvas, ctx, baseCanvas }
+}
+
+// Redraw base + count badge onto an existing ctx (synchronous — call when count changes)
+export function drawTeamCount(ctx, baseCanvas, size, count) {
+  ctx.clearRect(0, 0, size, size)
+  ctx.drawImage(baseCanvas, 0, 0)
+  if (count <= 1) return
+  // Badge circle
+  const r = size * 0.22
+  const bx = size - r - 2, by = size - r - 2
+  ctx.beginPath()
+  ctx.arc(bx, by, r, 0, Math.PI * 2)
+  ctx.fillStyle = 'rgba(0,0,0,0.75)'
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(255,255,255,0.8)'
+  ctx.lineWidth = size * 0.03
+  ctx.stroke()
+  // Count text
+  ctx.fillStyle = '#ffffff'
+  ctx.font = `bold ${Math.round(r * 1.1)}px sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(String(count), bx, by)
+}
+
 export function createBuildingCanvas(buildingType, size = 64) {
   const svgStr = BUILDING_SVGS[buildingType] || BUILDING_SVGS['rock']
   return svgToCanvas(svgStr, '#888888', size)

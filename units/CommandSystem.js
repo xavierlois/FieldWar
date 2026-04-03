@@ -7,7 +7,7 @@ import { EventBus } from '../core/EventBus.js'
 
 // Commands that need a target hex
 export const NEEDS_TARGET_HEX = new Set([
-  'guard-position', 'overwatch', 'patrol', 'attack-along-path'
+  'charge', 'guard-position', 'overwatch', 'patrol', 'attack-along-path'
 ])
 
 // Commands that need an enemy target team
@@ -76,11 +76,15 @@ function defaultAdvance(units, faction, grid, dt) {
 
 function execCharge(units, team, grid, dt) {
   const enemies = getEnemies(team)
+  const dest = team.targetHex
   units.forEach(unit => {
-    unit.exposed = true  // will be checked for defense penalty
-    const target = findNearestEnemy(unit, enemies)
-    if (!target) return
-    moveUnitToward(unit, target.q, target.r, grid, dt, 1.5)  // 1.5x speed
+    unit.exposed = true
+    if (dest) {
+      moveUnitToward(unit, dest.q, dest.r, grid, dt, 1.5)
+    } else {
+      const target = findNearestEnemy(unit, enemies)
+      if (target) moveUnitToward(unit, target.q, target.r, grid, dt, 1.5)
+    }
     tryAttack(unit, enemies, grid)
   })
   return true
