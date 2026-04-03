@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>FieldWar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="game-canvas"></canvas>
+    <div id="ui-overlay">
+      <div id="top-bar">
+        <span id="scenario-name">FieldWar</span>
+        <span id="turn-counter">Round 1</span>
+        <span id="phase-label">–</span>
+      </div>
+      <div id="bottom-panel">
+        <div id="team-list"></div>
+        <div id="command-panel"></div>
+        <button id="execute-btn" class="hidden">EXECUTE</button>
+        <button id="end-turn-btn" class="hidden">END TURN</button>
+      </div>
+    </div>
+    <div id="screen-overlay"></div>
+    <div id="emergency-overlay" class="hidden">
+      <div id="emergency-banner"></div>
+      <div id="emergency-cards"></div>
+      <button id="emergency-resume">RESUME</button>
+    </div>
+  </div>
+
+  <!-- VibeJam 2026 entry marker -->
+  <div id="vibejam" style="display:none" data-game="FieldWar" data-author="vibejam2026"></div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
