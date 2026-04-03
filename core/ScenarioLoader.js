@@ -35,7 +35,7 @@ function autoPlaceUnits(units, grid, faction, gridRows, gridCols) {
   return placed
 }
 
-export async function loadScenario(scenarioId) {
+export async function loadScenario(scenarioId, unitOverride = null) {
   resetUnitIdCounter()
   resetTeamIdCounter()
   GameState.reset()
@@ -57,9 +57,9 @@ export async function loadScenario(scenarioId) {
   GameState.gridCols = cols
   GameState.gridRows = rows
 
-  // Create units for both factions
-  const playerUnitDefs = data.units.player || []
-  const aiUnitDefs = data.units.ai || []
+  // Create units for both factions — use override if provided
+  const playerUnitDefs = unitOverride?.player || data.units.player || []
+  const aiUnitDefs     = unitOverride?.ai     || data.units.ai     || []
 
   // Expand unit defs (count field)
   function expandUnits(defs, faction) {

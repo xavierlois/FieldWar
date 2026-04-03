@@ -55,13 +55,26 @@ function gameLoop(timestamp) {
 }
 requestAnimationFrame(gameLoop)
 
+// ─── Troop presets ────────────────────────────────────────────────────────────
+
+const TROOP_PRESETS = {
+  same: {
+    player: [{ type: 'foot-soldier', count: 4 }, { type: 'archer', count: 3 }, { type: 'shield-bearer', count: 2 }],
+    ai:     [{ type: 'foot-soldier', count: 4 }, { type: 'archer', count: 3 }, { type: 'shield-bearer', count: 2 }]
+  },
+  different: {
+    player: [{ type: 'foot-soldier', count: 3 }, { type: 'archer', count: 3 }, { type: 'shield-bearer', count: 2 }, { type: 'knight', count: 1 }],
+    ai:     [{ type: 'knight', count: 3 }, { type: 'archer', count: 2 }, { type: 'foot-soldier', count: 3 }, { type: 'shield-bearer', count: 1 }]
+  }
+}
+
 // ─── Screen transitions ───────────────────────────────────────────────────────
 
-async function handleScenarioSelected({ id, difficulty }) {
+async function handleScenarioSelected({ troops = 'same' }) {
   hideScenarioSelect()
 
-  await loadScenario(id)  // internally resets GameState
-  GameState.difficulty = difficulty  // set AFTER reset
+  const unitOverride = TROOP_PRESETS[troops] || TROOP_PRESETS.same
+  await loadScenario('scenario-08', unitOverride)
 
   renderGrid(GameState.grid)
   await renderBuildings(GameState.grid)

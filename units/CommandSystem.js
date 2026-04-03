@@ -1,5 +1,5 @@
 import { GameState } from '../core/GameState.js'
-import { hexPath, reachableHexes, hexDistance, hexNeighbors, hexToWorld, effectiveHeight } from '../core/HexGrid.js'
+import { hexPath, reachableHexes, hexDistance, hexNeighbors, hexToWorld, effectiveHeight, moveCost } from '../core/HexGrid.js'
 import { resolveAttack } from '../combat/CombatResolver.js'
 import { hasLOS } from '../combat/LineOfSight.js'
 import { setUnitTargetPosition } from '../render/UnitRenderer.js'
@@ -432,7 +432,7 @@ function moveUnitToward(unit, destQ, destR, grid, dt, speedMult = 1.0) {
   if (!destHex?.passable) return
 
   // Find path — use large range so units can navigate the full map
-  const path = hexPath(grid, unit.q, unit.r, destQ, destR, 30)
+  const path = hexPath(grid, unit.q, unit.r, destQ, destR, 60)
   if (!path || path.length === 0) return
 
   const nextHex = path[0]
@@ -441,7 +441,11 @@ function moveUnitToward(unit, destQ, destR, grid, dt, speedMult = 1.0) {
   // Only actually change hex position when we "arrive" at the next hex
   // Use a timer-based approach: each unit has a moveProgress
   if (!unit._moveProgress) unit._moveProgress = 0
-  const speed = UNIT_SPEED * speedMult * GameState.resolutionSpeed
+
+  // Scale speed by terrain cost of the next hex — hills and forest slow movement
+  const nextHexData = grid.get(`${nextHex.q},${nextHex.r}`)
+  const terrainCost = nextHexData ? moveCost(nextHexData) : 1
+  const speed = (UNIT_SPEED * speedMult * GameState.resolutionSpeed) / terrainCost
 
   unit._moveProgress += speed * dt
 

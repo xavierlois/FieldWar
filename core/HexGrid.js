@@ -75,30 +75,52 @@ export function getFlankType(attackerQ, attackerR, defenderQ, defenderR, defende
   return 'front'
 }
 
-// BFS pathfinding on the hex grid
-export function hexPath(grid, fromQ, fromR, toQ, toR, maxRange = 20) {
+// Dijkstra pathfinding — respects terrain movement costs (hills, forest cost more)
+export function hexPath(grid, fromQ, fromR, toQ, toR, maxCost = 40) {
   const start = hexKey(fromQ, fromR)
-  const end = hexKey(toQ, toR)
+  const end   = hexKey(toQ, toR)
   if (start === end) return []
 
-  const queue = [{ q: fromQ, r: fromR, path: [] }]
-  const visited = new Set([start])
+  const dist = new Map([[start, 0]])
+  const prev = new Map()
+  // Priority queue as flat array (maps are small, splice is fine)
+  const queue = [{ q: fromQ, r: fromR, cost: 0 }]
 
   while (queue.length > 0) {
-    const { q, r, path } = queue.shift()
-    if (path.length >= maxRange) continue
+    // Pop minimum-cost entry
+    let minIdx = 0
+    for (let i = 1; i < queue.length; i++) {
+      if (queue[i].cost < queue[minIdx].cost) minIdx = i
+    }
+    const { q, r, cost } = queue.splice(minIdx, 1)[0]
+    const key = hexKey(q, r)
+
+    if (key === end) {
+      // Reconstruct path from prev map
+      const path = []
+      let cur = end
+      while (cur !== start) {
+        const [cq, cr] = cur.split(',').map(Number)
+        path.unshift({ q: cq, r: cr })
+        cur = prev.get(cur)
+      }
+      return path
+    }
+
+    if (cost > (dist.get(key) ?? Infinity)) continue  // stale entry
 
     for (const dir of HEX_DIRS) {
       const nq = q + dir.q, nr = r + dir.r
-      const key = hexKey(nq, nr)
-      if (visited.has(key)) continue
-      const hex = grid.get(key)
+      const nkey = hexKey(nq, nr)
+      const hex = grid.get(nkey)
       if (!hex || !hex.passable) continue
-
-      const newPath = [...path, { q: nq, r: nr }]
-      if (key === end) return newPath
-      visited.add(key)
-      queue.push({ q: nq, r: nr, path: newPath })
+      const newCost = cost + moveCost(hex)
+      if (newCost > maxCost) continue
+      if (!dist.has(nkey) || newCost < dist.get(nkey)) {
+        dist.set(nkey, newCost)
+        prev.set(nkey, key)
+        queue.push({ q: nq, r: nr, cost: newCost })
+      }
     }
   }
   return null // no path
