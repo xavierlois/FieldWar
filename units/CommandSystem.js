@@ -10,9 +10,14 @@ export const NEEDS_TARGET_HEX = new Set([
   'guard-position', 'overwatch', 'patrol', 'attack-along-path'
 ])
 
-// Commands that need a target team
+// Commands that need an enemy target team
 export const NEEDS_TARGET_TEAM = new Set([
-  'cover-team', 'envelop', 'suppressive-fire'
+  'envelop', 'suppressive-fire'
+])
+
+// Commands that need an ally target team
+export const NEEDS_ALLY_TARGET = new Set([
+  'cover-team', 'screen'
 ])
 
 // Execute a team's command for one resolution step
@@ -422,8 +427,8 @@ function moveUnitToward(unit, destQ, destR, grid, dt, speedMult = 1.0) {
   const destHex = grid.get(`${destQ},${destR}`)
   if (!destHex?.passable) return
 
-  // Find path
-  const path = hexPath(grid, unit.q, unit.r, destQ, destR, unit.move + 2)
+  // Find path — use large range so units can navigate the full map
+  const path = hexPath(grid, unit.q, unit.r, destQ, destR, 30)
   if (!path || path.length === 0) return
 
   const nextHex = path[0]

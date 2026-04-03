@@ -1,6 +1,6 @@
 import { GameState } from '../core/GameState.js'
 import { EventBus } from '../core/EventBus.js'
-import { NEEDS_TARGET_HEX, NEEDS_TARGET_TEAM } from '../units/CommandSystem.js'
+import { NEEDS_TARGET_HEX, NEEDS_TARGET_TEAM, NEEDS_ALLY_TARGET } from '../units/CommandSystem.js'
 import {
   renderTeamList, renderCommandPanel, hideCommandPanel,
   updateTeamCardSelection, showTargetPrompt, showConfirmPrompt
@@ -71,12 +71,21 @@ function onCommandSelected({ teamId, command }) {
     return
   }
 
-  // Commands needing target team
+  // Commands needing enemy target team
   if (NEEDS_TARGET_TEAM.has(command)) {
     team.setCommand(command)
     GameState.awaitingTargetFor = teamId
     renderCommandPanel(team)
     showTargetPrompt('TAP AN ENEMY TEAM TO TARGET')
+    return
+  }
+
+  // Commands needing ally target team
+  if (NEEDS_ALLY_TARGET.has(command)) {
+    team.setCommand(command)
+    GameState.awaitingTargetFor = teamId
+    renderCommandPanel(team)
+    showTargetPrompt('TAP AN ALLY TEAM TO SUPPORT')
     return
   }
 
@@ -129,20 +138,33 @@ function onUnitTapped({ unitId }) {
   const unit = GameState.units.get(unitId)
   if (!unit) return
 
-  if (unit.faction === 'player') {
+  const awaitingTeam = GameState.awaitingTargetFor
+    ? GameState.getTeam(GameState.awaitingTargetFor)
+    : null
+
+  if (unit.faction === 'ai' && awaitingTeam && NEEDS_TARGET_TEAM.has(awaitingTeam.command)) {
+    // Targeting an enemy team
+    const enemyTeam = GameState.getTeamForUnit(unitId)
+    if (enemyTeam) {
+      awaitingTeam.targetTeamId = enemyTeam.id
+      GameState.awaitingTargetFor = null
+      renderTeamList()
+      renderCommandPanel(awaitingTeam)
+    }
+  } else if (unit.faction === 'player' && awaitingTeam && NEEDS_ALLY_TARGET.has(awaitingTeam.command)) {
+    // Targeting an ally team
+    const allyTeam = GameState.getTeamForUnit(unitId)
+    if (allyTeam && allyTeam.id !== awaitingTeam.id) {
+      awaitingTeam.targetTeamId = allyTeam.id
+      GameState.awaitingTargetFor = null
+      renderTeamList()
+      renderCommandPanel(awaitingTeam)
+    }
+  } else if (unit.faction === 'player') {
+    // Select this unit's team
     const team = GameState.getTeamForUnit(unitId)
     if (team) {
       EventBus.emit('team-selected', { teamId: team.id })
-    }
-  } else if (unit.faction === 'ai' && GameState.awaitingTargetFor) {
-    // Targeting an enemy team
-    const team = GameState.getTeam(GameState.awaitingTargetFor)
-    const enemyTeam = GameState.getTeamForUnit(unitId)
-    if (team && enemyTeam) {
-      team.targetTeamId = enemyTeam.id
-      GameState.awaitingTargetFor = null
-      renderTeamList()
-      renderCommandPanel(team)
     }
   }
 }
