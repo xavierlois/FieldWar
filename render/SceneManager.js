@@ -9,8 +9,8 @@ const CAMERA_ANGLE = Math.PI / 4  // 45 degrees tilt
 
 // Grid world-space bounds (scenario-08: 9 cols × 18 rows, flat-top hexes, HEX_RADIUS=1.0)
 // x: ±6.0,  z: ~±12.1  (from buildGrid centering)
-const GRID_Z_HALF = 13.5  // world-z half-extent (17×22 grid, HEX_RADIUS=0.5) + small margin
-const GRID_X_HALF = 7.0   // world-x half-extent + small margin
+const GRID_Z_HALF = 10.0  // world-z half-extent (33×22 staggered grid, HEX_RADIUS=0.5) + margin
+const GRID_X_HALF = 12.5  // world-x half-extent + margin — optimised to fill 16:9 screens
 
 // Compute the orthographic half-size that just fits the full grid on screen.
 // On height-constrained screens (landscape/desktop): fit by z-extent.
