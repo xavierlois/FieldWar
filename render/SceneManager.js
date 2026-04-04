@@ -7,6 +7,20 @@ let resizeObserver
 const CAMERA_DISTANCE = 22
 const CAMERA_ANGLE = Math.PI / 4  // 45 degrees tilt
 
+// Grid world-space bounds (scenario-08: 9 cols × 18 rows, flat-top hexes, HEX_RADIUS=1.0)
+// x: ±6.0,  z: ~±12.1  (from buildGrid centering)
+const GRID_Z_HALF = 12.5  // world-z half-extent (grid edge to grid edge) + small margin
+const GRID_X_HALF = 7.0   // world-x half-extent + small margin
+
+// Compute the orthographic half-size that just fits the full grid on screen.
+// On height-constrained screens (landscape/desktop): fit by z-extent.
+// On width-constrained screens (narrow portrait): fit by x-extent.
+function computeSize(aspect) {
+  const sizeH = GRID_Z_HALF * Math.sin(CAMERA_ANGLE)  // z-extent → camera-space height
+  const sizeW = GRID_X_HALF / aspect                   // x-extent → camera-space width
+  return Math.max(sizeH, sizeW) * 1.12                 // 12% padding so grid isn't edge-to-edge
+}
+
 export function initScene(canvas) {
   clock = new THREE.Clock()
 
@@ -45,8 +59,7 @@ export function initScene(canvas) {
 
 function createCamera(width, height) {
   const aspect = width / height
-  // Size chosen to fit 9x14 hex grid
-  const size = 14
+  const size = computeSize(aspect)
   const cam = new THREE.OrthographicCamera(
     -size * aspect, size * aspect,
     size, -size,
@@ -65,7 +78,7 @@ function onResize() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 
   const aspect = w / h
-  const size = 14
+  const size = computeSize(aspect)
   camera.left   = -size * aspect
   camera.right  =  size * aspect
   camera.top    =  size

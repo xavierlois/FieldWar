@@ -14,27 +14,27 @@ export function showScenarioSelect() {
         <div style="text-align:center;margin-top:20px;">
           <div style="
             font-family:'Barlow Condensed',sans-serif;
-            font-size:80px; font-weight:700; letter-spacing:12px;
+            font-size:clamp(56px,14vmin,110px); font-weight:700; letter-spacing:clamp(8px,2vmin,16px);
             text-transform:uppercase; line-height:0.88;
             color:#e6edf3;
             text-shadow:0 0 60px rgba(43,127,212,0.6),0 0 20px rgba(43,127,212,0.3),0 4px 24px rgba(0,0,0,0.9);
           ">FIELD</div>
           <div style="
             font-family:'Barlow Condensed',sans-serif;
-            font-size:80px; font-weight:700; letter-spacing:12px;
+            font-size:clamp(56px,14vmin,110px); font-weight:700; letter-spacing:clamp(8px,2vmin,16px);
             text-transform:uppercase; line-height:0.88;
             color:#2B7FD4;
             text-shadow:0 0 60px rgba(43,127,212,0.9),0 0 30px rgba(43,127,212,0.5),0 4px 24px rgba(0,0,0,0.9);
           ">WAR</div>
           <div style="
             font-family:'Share Tech Mono',monospace;
-            font-size:11px; letter-spacing:5px; color:#8b949e;
+            font-size:clamp(10px,1.5vmin,14px); letter-spacing:5px; color:#8b949e;
             margin-top:14px; text-transform:uppercase;
             text-shadow:0 1px 4px rgba(0,0,0,0.8);
           ">Hex Tactical Combat</div>
         </div>
 
-        <div style="width:100%;display:flex;flex-direction:column;gap:10px;">
+        <div style="width:100%;max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:10px;">
           <div style="
             font-family:'Barlow Condensed',sans-serif;
             font-size:11px; letter-spacing:3px; color:#8b949e;
