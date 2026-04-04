@@ -376,6 +376,7 @@ function moveTeamToward(team, destQ, destR, grid, dt, speedMult = 1.0) {
 
 function tryAttack(team, enemies, grid) {
   if (team.attackCooldown > 0) return
+  if (team.moving) return  // wait for step animation to land before attacking
 
   const alive = GameState.getAliveTeamUnits(team)
   if (alive.length === 0) return
