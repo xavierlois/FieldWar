@@ -29,12 +29,14 @@ export function clearAll() {
 
 export function showSelectedTeam(team, grid) {
   clearAll()
-  team.unitIds
+  const aliveUnits = team.unitIds
     .map(id => GameState.units.get(id))
     .filter(u => u?.alive)
-    .forEach(unit => {
-      addHexOverlay(unit.q, unit.r, grid, SELECT_COLOR, SELECT_OPACITY, true)
-    })
+
+  if (aliveUnits.length > 0) {
+    const anchorUnit = aliveUnits[0]
+    addHexOverlay(anchorUnit.q, anchorUnit.r, grid, SELECT_COLOR, SELECT_OPACITY, true)
+  }
 }
 
 export function showValidMoves(hexes, grid) {
@@ -60,9 +62,9 @@ function addHexOverlay(q, r, grid, color, opacity, pulse = false) {
   if (!hex) return null
 
   const h = effectiveHeight(hex)
-  const y = h * 0.35 + 0.1 + 0.02
+  const y = h * 0.25 + 0.08 + 0.02
 
-  const geo = new THREE.CylinderGeometry(HEX_RADIUS - 0.06, HEX_RADIUS - 0.06, 0.04, 6, 1)
+  const geo = new THREE.CylinderGeometry(HEX_RADIUS - 0.03, HEX_RADIUS - 0.03, 0.03, 6, 1)
   geo.rotateY(Math.PI / 6)
   const mat = new THREE.MeshBasicMaterial({
     color,
@@ -107,7 +109,7 @@ export function showPatrolPath(waypoints, grid) {
     const pos = hexToWorld(q, r)
     const hex = grid.get(`${q},${r}`)
     const h = hex ? effectiveHeight(hex) : 1
-    return new THREE.Vector3(pos.x, h * 0.35 + 0.25, pos.z)
+    return new THREE.Vector3(pos.x, h * 0.25 + 0.18, pos.z)
   })
 
   const geo = new THREE.BufferGeometry().setFromPoints(points)

@@ -1,12 +1,12 @@
 // Axial hex coordinate system (flat-top hexes)
 // q = column, r = row
 
-export const HEX_RADIUS = 1.0  // Three.js world units
+export const HEX_RADIUS = 0.5  // Three.js world units
 
 // 6 neighbor directions for flat-top hex (axial)
 export const HEX_DIRS = [
-  { q: +1, r:  0 }, { q: +1, r: -1 }, { q:  0, r: -1 },
-  { q: -1, r:  0 }, { q: -1, r: +1 }, { q:  0, r: +1 }
+  { q: +1, r: 0 }, { q: +1, r: -1 }, { q: 0, r: -1 },
+  { q: -1, r: 0 }, { q: -1, r: +1 }, { q: 0, r: +1 }
 ]
 
 export function hexKey(q, r) { return `${q},${r}` }
@@ -78,7 +78,7 @@ export function getFlankType(attackerQ, attackerR, defenderQ, defenderR, defende
 // Dijkstra pathfinding — respects terrain movement costs (hills, forest cost more)
 export function hexPath(grid, fromQ, fromR, toQ, toR, maxCost = 40) {
   const start = hexKey(fromQ, fromR)
-  const end   = hexKey(toQ, toR)
+  const end = hexKey(toQ, toR)
   if (start === end) return []
 
   const dist = new Map([[start, 0]])
@@ -180,7 +180,7 @@ export function buildGrid(hexDefs, buildingDefs = []) {
       q, r,
       height: def.height ?? 1,
       building: null,
-      unitId: null,
+      teamId: null,
       passable: true,
     })
   })

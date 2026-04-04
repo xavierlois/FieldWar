@@ -17,8 +17,8 @@ const BUILDING_COLORS = {
   trench: 0x2a2010,
 }
 
-const HEX_HEIGHT_SCALE = 0.35  // visual extrusion per height level
-const HEX_GAP = 0.03           // small gap between hex tiles
+const HEX_HEIGHT_SCALE = 0.25  // visual extrusion per height level (scaled for smaller hexes)
+const HEX_GAP = 0.015          // small gap between hex tiles
 
 let hexMeshes = new Map()  // key → mesh
 let hexGroup
@@ -74,7 +74,7 @@ function createHexMesh(hex) {
     side: THREE.BackSide
   })
   const edgeMesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(r + 0.04, r + 0.04, visualHeight + 0.01, 6, 1, false),
+    new THREE.CylinderGeometry(r + 0.02, r + 0.02, visualHeight + 0.01, 6, 1, false),
     edgeMat
   )
   edgeMesh.geometry.rotateY(Math.PI / 6)
@@ -89,7 +89,7 @@ function createHexMesh(hex) {
 }
 
 function addHeightRings(parent, r, h) {
-  const ringGeo = new THREE.TorusGeometry(r * 0.7, 0.02, 4, 6)
+  const ringGeo = new THREE.TorusGeometry(r * 0.7, 0.01, 4, 6)
   const ringMat = new THREE.MeshLambertMaterial({ color: 0x4a6a3a })
   const ring = new THREE.Mesh(ringGeo, ringMat)
   ring.rotation.x = Math.PI / 2

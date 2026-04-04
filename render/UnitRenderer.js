@@ -5,8 +5,8 @@ import { createUnitCanvas, createTeamCanvas, drawTeamCount } from '../assets/spr
 import { GameState } from '../core/GameState.js'
 
 const PLAYER_COLOR = '#2B7FD4'
-const AI_COLOR     = '#E8820C'
-const SPRITE_SIZE  = 1.4
+const AI_COLOR = '#E8820C'
+const SPRITE_SIZE = 0.7
 
 let teamGroup
 // teamId → { sprite, texture, canvas, ctx, baseCanvas, count }
@@ -42,12 +42,10 @@ async function _addTeamSprite(team) {
   const aliveUnits = GameState.getAliveTeamUnits(team)
   if (aliveUnits.length === 0) return
 
-  // Initialize each unit's world position from its hex position
-  aliveUnits.forEach(unit => {
-    const wp = hexToWorld(unit.q, unit.r)
-    unit.worldX = wp.x;  unit.worldZ = wp.z
-    unit.targetWorldX = wp.x;  unit.targetWorldZ = wp.z
-  })
+  // Initialize team's world position from its hex position
+  const wp = hexToWorld(team.q, team.r)
+  team.worldX = wp.x; team.worldZ = wp.z
+  team.targetWorldX = wp.x; team.targetWorldZ = wp.z
 
   const color = team.faction === 'player' ? PLAYER_COLOR : AI_COLOR
   const { canvas, ctx, baseCanvas } = await createTeamCanvas(team.unitType, color, 128, aliveUnits.length)
@@ -57,33 +55,31 @@ async function _addTeamSprite(team) {
   const sprite = new THREE.Sprite(material)
   sprite.scale.set(SPRITE_SIZE, SPRITE_SIZE, 1)
 
-  const centroid = _teamCentroid(aliveUnits)
-  const wp = hexToWorld(centroid.q, centroid.r)
-  sprite.position.set(wp.x, _spriteY(centroid.q, centroid.r), wp.z)
+  sprite.position.set(team.worldX, _spriteY(team.q, team.r), team.worldZ)
 
   // userData lets InputManager detect taps
   sprite.userData = { teamId: team.id, unitId: aliveUnits[0].id, isUnit: true }
 
   teamGroup.add(sprite)
-  teamSprites.set(team.id, { sprite, texture, canvas, ctx, baseCanvas, count: aliveUnits.length })
+  teamSprites.set(team.id, { sprite, texture, canvas, ctx, baseCanvas, count: aliveUnits.length, command: team.command })
 }
 
-// Called each RAF frame — interpolates unit worldX/Z and moves team sprites to centroid
-export function updateTeamPositions(units, dt) {
+// Called each RAF frame — interpolates team worldX/Z and moves team sprites
+export function updateTeamPositions(teams, dt) {
   const speed = 4.0 * GameState.resolutionSpeed
 
-  // 1. Interpolate each unit's world position
-  units.filter(u => u.alive).forEach(unit => {
-    const dx = unit.targetWorldX - unit.worldX
-    const dz = unit.targetWorldZ - unit.worldZ
+  // 1. Interpolate each team's world position
+  teams.filter(t => t.isAlive).forEach(team => {
+    const dx = team.targetWorldX - team.worldX
+    const dz = team.targetWorldZ - team.worldZ
     const dist = Math.sqrt(dx * dx + dz * dz)
     if (dist > 0.01) {
       const move = Math.min(speed * dt, dist)
-      unit.worldX += (dx / dist) * move
-      unit.worldZ += (dz / dist) * move
+      team.worldX += (dx / dist) * move
+      team.worldZ += (dz / dist) * move
     } else {
-      unit.worldX = unit.targetWorldX
-      unit.worldZ = unit.targetWorldZ
+      team.worldX = team.targetWorldX
+      team.worldZ = team.targetWorldZ
     }
   })
 
@@ -95,20 +91,25 @@ export function updateTeamPositions(units, dt) {
     const aliveUnits = GameState.getAliveTeamUnits(team)
     if (aliveUnits.length === 0) { _removeTeamSprite(teamId); continue }
 
-    // Update count badge if a unit died
-    if (aliveUnits.length !== data.count) {
+    // Update count/command badge if changed
+    if (aliveUnits.length !== data.count || team.command !== data.command) {
       data.count = aliveUnits.length
+      data.command = team.command
       drawTeamCount(data.ctx, data.baseCanvas, 128, data.count)
+      if (data.command) {
+        _drawActionIcon(data.ctx, 128)
+      }
       data.texture.needsUpdate = true
       // Update unitId in case first unit was the one that died
       data.sprite.userData.unitId = aliveUnits[0].id
     }
 
-    // Move sprite to centroid of unit world positions
-    const cx = aliveUnits.reduce((s, u) => s + u.worldX, 0) / aliveUnits.length
-    const cz = aliveUnits.reduce((s, u) => s + u.worldZ, 0) / aliveUnits.length
-    const firstUnit = aliveUnits[0]
-    data.sprite.position.set(cx, _spriteY(firstUnit.q, firstUnit.r), cz)
+    // Move sprite to the team's world position
+    data.sprite.position.set(
+      team.worldX,
+      _spriteY(team.q, team.r),
+      team.worldZ
+    )
   }
 }
 
@@ -130,19 +131,38 @@ function _teamCentroid(aliveUnits) {
 function _spriteY(q, r) {
   const hex = GameState.grid.get(`${q},${r}`)
   const h = hex ? effectiveHeight(hex) : 1
-  return h * 0.35 + 0.1 + SPRITE_SIZE * 0.6
+  return h * 0.25 + 0.08 + SPRITE_SIZE * 0.6
 }
 
-export function setUnitTargetPosition(unit, q, r) {
+export function setTeamTargetPosition(team, q, r) {
   const pos = hexToWorld(q, r)
-  unit.targetWorldX = pos.x
-  unit.targetWorldZ = pos.z
-  unit.q = q
-  unit.r = r
+  team.targetWorldX = pos.x
+  team.targetWorldZ = pos.z
+  team.q = q
+  team.r = r
 }
 
 // No-op: count updates happen automatically in updateTeamPositions
-export function animateDeath(unitId) {}
+export function animateDeath(unitId) { }
+
+function _drawActionIcon(ctx, size) {
+  const cx = size * 0.82
+  const cy = size * 0.18
+  const r = size * 0.16
+  ctx.beginPath()
+  ctx.arc(cx, cy, r, 0, Math.PI * 2)
+  ctx.fillStyle = '#10B981' // Action green
+  ctx.fill()
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = size * 0.02
+  ctx.stroke()
+
+  ctx.fillStyle = '#ffffff'
+  ctx.font = `bold ${size * 0.22}px "Barlow Condensed", sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('✓', cx, cy + size * 0.02)
+}
 
 export function flashTeam(teamId, color = 0xff4444, duration = 300) {
   const data = teamSprites.get(teamId)

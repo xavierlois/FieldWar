@@ -20,7 +20,7 @@ export const UNIT_TYPES = {
     label: 'Archers',
     icon: '🏹',
     hp: 2, ap: 3, move: 2, attackRange: 2, maxAttackRange: 3, attackValue: 2, defense: 0,
-    attackSpeed: 2.5,   // slower rate, ranged
+    attackSpeed: 1.25,  // ranged (doubled rate)
     color: '#7a9e7e',
     commands: ALL_COMMANDS
   },
